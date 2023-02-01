@@ -9,8 +9,10 @@ from core import users_db
 import base64
 from core import avatar_resize
 from auth import secure, verify_password, generate_token
+from fastapi_socketio import SocketManager
 
 app = FastAPI()
+sockets = SocketManager(app=app)
 
 origins = ["*"]
 
@@ -49,7 +51,7 @@ async def change_info(email: str, auth: str = Header(None), file: UploadFile = F
     if not extension:
         raise HTTPException(status_code=400, detail="Image must be jpg or png format!")
     if auth is None:
-        raise HTTPException(status_code=422, detail="Unauthorized")
+        raise HTTPException(status_code=401, detail="Unauthorized")
     username = secure(auth)
     user_id = username["sub"]
     image = await file.read()
@@ -61,3 +63,11 @@ async def change_info(email: str, auth: str = Header(None), file: UploadFile = F
     avatar_400 = base64.b64encode(resized_image_400).decode("utf-8")
     users_db.edit_user(user_id, email, avatar_50, avatar_100, avatar_400)
     return {"Message": "Success!"}
+
+
+@app.sio.on("connect")
+async def connect(sid, environ):
+    print(f"Connected sid->{sid}")
+
+
+app.include_router(sockets.on(), prefix="/socket.io", tags=["socket.io"])
