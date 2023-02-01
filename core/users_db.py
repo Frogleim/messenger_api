@@ -1,4 +1,11 @@
 import psycopg2
+from pydantic import BaseModel
+import bcrypt
+
+
+class User(BaseModel):
+    username: str
+    password: str
 
 
 def db_connect():
@@ -11,27 +18,15 @@ def db_connect():
     return conn
 
 
-def create_table():
-    connection = db_connect()
-
-    cursor = connection.cursor()
-
-    create_table_sql = """
-    CREATE TABLE IF NOT EXISTS messenger_users (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(255),
-        password VARCHAR(255),
-        email VARCHAR(255),
-        avatar_50x50 TEXT,
-        avatar_100x100 TEXT,
-        avatar_400x400 TEXT
-        
-    );
-    """
-
-    cursor.execute(create_table_sql)
-    connection.commit()
-    connection.close()
+def check_username(username):
+    with db_connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM messenger_users WHERE username = '{username}'"),
+        result = cursor.fetchone()
+        if result is None:
+            return False
+        else:
+            return True
 
 
 def save_users(username, password):
@@ -46,36 +41,22 @@ def save_users(username, password):
     print('Saved Successfully')
 
 
-def check_username(username):
+def retrieve_user(username: str, password: str):
     with db_connect() as conn:
         cursor = conn.cursor()
-        cursor.execute(f"SELECT * FROM messenger_users WHERE username = '{username}'"),
-        result = cursor.fetchone()
-        if result is None:
-            return False
-        else:
-            return True
+        cursor.execute("SELECT * FROM messenger_users WHERE username=%s AND password=%s", (username, password))
+        user = cursor.fetchone()
+        if not user:
+            return None
+        return User(username=user[0], password=user[1])
 
 
-def check_password(password):
-
-    with db_connect() as conn:
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT * FROM messenger_users WHERE password = '{password}'"),
-        result = cursor.fetchone()
-        if result is None:
-            return False
-        else:
-            return True
-
-
-def edit_user(e_mail, avatar50, avatar100, avatar400):
+def edit_user(id, e_mail, avatar50, avatar100, avatar400):
     connection = db_connect()
     curs = connection.cursor()
-    curs.execute("INSERT INTO messenger_users (e_mail, avatar_50, avatar_100, avatar_100)"
-                 " VALUES (%s, %s)",
-
-                 (e_mail, avatar50, avatar100, avatar400))
+    curs.execute("UPDATE messenger_users SET email=%s, avatar_50x50=%s, avatar_100x100=%s, "
+                 "avatar_400x400=%s WHERE id=%s",
+                 (e_mail, avatar50, avatar100, avatar400, id))
     connection.commit()
     connection.close()
     print('Saved Successfully')
